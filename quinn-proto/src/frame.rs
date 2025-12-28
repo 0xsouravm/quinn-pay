@@ -5,7 +5,7 @@ use std::{
 };
 
 use bytes::{Buf, BufMut, Bytes};
-use ed25519_dalek::{Signature, VerifyingKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
+use ed25519_dalek::{PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH, Signature, VerifyingKey};
 use sha2::{Digest, Sha256};
 use tinyvec::TinyVec;
 
@@ -1022,10 +1022,12 @@ pub(crate) struct Payment {
 impl fmt::Debug for Payment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let hex = |bytes: &[u8]| {
-            bytes.iter().fold(String::with_capacity(bytes.len() * 2), |mut s, b| {
-                write!(s, "{:02x}", b).unwrap();
-                s
-            })
+            bytes
+                .iter()
+                .fold(String::with_capacity(bytes.len() * 2), |mut s, b| {
+                    write!(s, "{:02x}", b).unwrap();
+                    s
+                })
         };
 
         f.debug_struct("Payment")
@@ -1060,8 +1062,8 @@ impl Payment {
 
     pub(crate) fn verify_signature(&self) -> Result<(), &'static str> {
         // Reconstruct the verifying key from the payer field
-        let verifying_key = VerifyingKey::from_bytes(&self.payer)
-            .map_err(|_| "invalid payer public key")?;
+        let verifying_key =
+            VerifyingKey::from_bytes(&self.payer).map_err(|_| "invalid payer public key")?;
 
         // Reconstruct the signature
         let signature = Signature::from_bytes(&self.signature);
@@ -1117,7 +1119,7 @@ impl FrameStruct for Payment {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{Side, Dir, coding::Codec};
+    use crate::{Dir, Side, coding::Codec};
     use assert_matches::assert_matches;
 
     fn frames(buf: Vec<u8>) -> Vec<Frame> {
@@ -1219,7 +1221,7 @@ mod test {
 
     #[test]
     fn payment_signature_verification() {
-        use ed25519_dalek::{SigningKey, Signer};
+        use ed25519_dalek::{Signer, SigningKey};
 
         let signing_key = SigningKey::from_bytes(&[2u8; 32]);
         let payer = signing_key.verifying_key().to_bytes();
@@ -1244,7 +1246,7 @@ mod test {
 
     #[test]
     fn payment_signature_verification_fails_wrong_key() {
-        use ed25519_dalek::{SigningKey, Signer};
+        use ed25519_dalek::{Signer, SigningKey};
 
         let signing_key = SigningKey::from_bytes(&[3u8; 32]);
         let wrong_key = SigningKey::from_bytes(&[4u8; 32]);
@@ -1270,7 +1272,7 @@ mod test {
 
     #[test]
     fn payment_roundtrip() {
-        use ed25519_dalek::{SigningKey, Signer};
+        use ed25519_dalek::{Signer, SigningKey};
 
         let signing_key = SigningKey::from_bytes(&[5u8; 32]);
         let payer = signing_key.verifying_key().to_bytes();
