@@ -114,6 +114,10 @@ macro_rules! make_struct {
             // Payment extension parameters
             /// Whether the endpoint supports PAYMENT frames
             pub(crate) payment_supported: bool,
+            /// Whether the endpoint requires payment for streams
+            pub(crate) payment_required: bool,
+            /// Minimum payment amount required per stream (in token base units)
+            pub(crate) min_payment_amount: Option<u64>,
             /// List of accepted token mint addresses (32 bytes each)
             pub(crate) accepted_tokens: Vec<[u8; 32]>,
             /// Default recipient address for payments (32 bytes)
@@ -143,6 +147,8 @@ macro_rules! make_struct {
                     write_order: None,
 
                     payment_supported: false,
+                    payment_required: false,
+                    min_payment_amount: None,
                     accepted_tokens: Vec::new(),
                     payment_recipient: None,
                 }

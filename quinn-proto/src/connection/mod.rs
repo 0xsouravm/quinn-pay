@@ -2836,6 +2836,36 @@ impl Connection {
                     self.read_crypto(SpaceId::Data, &frame, payload_len)?;
                 }
                 Frame::Stream(frame) => {
+                    let stream_id = frame.id;
+
+                    if let ConnectionSide::Server { ref server_config, .. } = self.side {
+                        if server_config.payment_required {
+                            match self.stream_payments.get(&stream_id) {
+                                None => {
+                                    debug!(stream_id = %stream_id, "stream without payment");
+                                    return Err(TransportError::PROTOCOL_VIOLATION(
+                                        "payment required but not provided",
+                                    ));
+                                }
+                                Some(payment) => {
+                                    if let Some(min_amount) = server_config.min_payment_amount {
+                                        if payment.amount < min_amount {
+                                            debug!(
+                                                stream_id = %stream_id,
+                                                amount = payment.amount,
+                                                required = min_amount,
+                                                "insufficient payment"
+                                            );
+                                            return Err(TransportError::PROTOCOL_VIOLATION(
+                                                "insufficient payment amount",
+                                            ));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     if self.streams.received(frame, payload_len)?.should_transmit() {
                         self.spaces[SpaceId::Data].pending.max_data = true;
                     }
@@ -3067,10 +3097,12 @@ impl Connection {
                         amount = payment.amount,
                         "received PAYMENT frame"
                     );
-                    // Store the payment for this stream
-                    // The application layer will retrieve and validate it
-                    self.stream_payments
-                        .insert(payment.stream_id, payment.clone());
+                    let stream_id = payment.stream_id;
+                    self.stream_payments.insert(stream_id, payment.clone());
+                    self.events.push_back(Event::PaymentReceived {
+                        stream_id,
+                        payment,
+                    });
                 }
             }
         }
@@ -4071,6 +4103,16 @@ pub enum Event {
     DatagramReceived,
     /// One or more application datagrams have been sent after blocking
     DatagramsUnblocked,
+    /// A payment frame was received
+    ///
+    /// The application should forward the signed transaction to the backend
+    /// for blockchain submission and settlement.
+    PaymentReceived {
+        /// The stream ID this payment is for
+        stream_id: StreamId,
+        /// The full payment details including signed Solana transaction
+        payment: frame::Payment,
+    },
 }
 
 fn get_max_ack_delay(params: &TransportParameters) -> Duration {

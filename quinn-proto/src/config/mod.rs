@@ -218,6 +218,12 @@ pub struct ServerConfig {
     /// rebinding. Enabled by default.
     pub(crate) migration: bool,
 
+    /// Whether to require payment for all streams
+    pub(crate) payment_required: bool,
+
+    /// Minimum payment amount required per stream (in token base units)
+    pub(crate) min_payment_amount: Option<u64>,
+
     pub(crate) preferred_address_v4: Option<SocketAddrV4>,
     pub(crate) preferred_address_v6: Option<SocketAddrV6>,
 
@@ -242,6 +248,8 @@ impl ServerConfig {
             retry_token_lifetime: Duration::from_secs(15),
 
             migration: true,
+            payment_required: false,
+            min_payment_amount: None,
 
             validation_token: ValidationTokenConfig::default(),
 
@@ -291,6 +299,25 @@ impl ServerConfig {
     /// rebinding. Enabled by default.
     pub fn migration(&mut self, value: bool) -> &mut Self {
         self.migration = value;
+        self
+    }
+
+    /// Whether to require payment for all streams
+    ///
+    /// When enabled, connections will be closed with PROTOCOL_VIOLATION if a client attempts
+    /// to send data on a stream without first sending a valid PAYMENT frame. Disabled by default.
+    pub fn payment_required(&mut self, value: bool) -> &mut Self {
+        self.payment_required = value;
+        self
+    }
+
+    /// Set minimum payment amount required per stream (in token base units)
+    ///
+    /// When set, payment amounts will be validated against this minimum. Clients sending
+    /// payments below this amount will have their connection closed with PROTOCOL_VIOLATION.
+    /// If payment_required is true but this is None, any non-zero payment is accepted.
+    pub fn min_payment_amount(&mut self, value: Option<u64>) -> &mut Self {
+        self.min_payment_amount = value;
         self
     }
 

@@ -601,6 +601,8 @@ impl Endpoint {
         params.stateless_reset_token = Some(ResetToken::new(&*self.config.reset_key, loc_cid));
         params.original_dst_cid = Some(incoming.token.orig_dst_cid);
         params.retry_src_cid = incoming.token.retry_src_cid;
+        params.payment_required = server_config.payment_required;
+        params.min_payment_amount = server_config.min_payment_amount;
         let mut pref_addr_cid = None;
         if server_config.has_preferred_address() {
             let cid = self.new_cid(ch);

@@ -740,6 +740,14 @@ impl Iter {
                 let timestamp = self.bytes.get_var()?;
                 let nonce = self.bytes.get_var()?;
 
+                // Read signed transaction
+                let txn_len = self.bytes.get_var()? as usize;
+                if self.bytes.remaining() < txn_len {
+                    return Err(IterErr::UnexpectedEnd);
+                }
+                let mut signed_transaction = vec![0u8; txn_len];
+                self.bytes.copy_to_slice(&mut signed_transaction);
+
                 // Read signature length and validate
                 let sig_len = self.bytes.get_var()? as usize;
                 if sig_len != SIGNATURE_LENGTH {
@@ -759,6 +767,7 @@ impl Iter {
                     recipient,
                     timestamp,
                     nonce,
+                    signed_transaction,
                     signature,
                 })
             }
@@ -1016,6 +1025,7 @@ pub(crate) struct Payment {
     pub recipient: [u8; PUBLIC_KEY_LENGTH],
     pub timestamp: u64,
     pub nonce: u64,
+    pub signed_transaction: Vec<u8>,
     pub signature: [u8; SIGNATURE_LENGTH],
 }
 
@@ -1038,6 +1048,7 @@ impl fmt::Debug for Payment {
             .field("recipient", &hex(&self.recipient))
             .field("timestamp", &self.timestamp)
             .field("nonce", &self.nonce)
+            .field("signed_transaction", &format!("{}bytes", self.signed_transaction.len()))
             .field("signature", &hex(&self.signature))
             .finish()
     }
@@ -1053,6 +1064,7 @@ impl Payment {
         hasher.update(self.recipient);
         hasher.update(self.timestamp.to_le_bytes());
         hasher.update(self.nonce.to_le_bytes());
+        hasher.update(&self.signed_transaction);
 
         let result = hasher.finalize();
         let mut hash = [0u8; 32];
@@ -1090,6 +1102,8 @@ impl Payment {
         buf.put_slice(&self.recipient);
         buf.write_var(self.timestamp);
         buf.write_var(self.nonce);
+        buf.write_var(self.signed_transaction.len() as u64);
+        buf.put_slice(&self.signed_transaction);
         buf.write_var(SIGNATURE_LENGTH as u64);
         buf.put_slice(&self.signature);
     }
@@ -1104,6 +1118,8 @@ impl Payment {
         + 1 + 32 // recipient length + recipient
         + VarInt::from_u64(self.timestamp).unwrap().size()
         + VarInt::from_u64(self.nonce).unwrap().size()
+        + VarInt::from_u64(self.signed_transaction.len() as u64).unwrap().size()
+        + self.signed_transaction.len()
         + VarInt::from_u64(SIGNATURE_LENGTH as u64).unwrap().size()
         + SIGNATURE_LENGTH
     }
@@ -1198,6 +1214,7 @@ mod test {
             recipient: [1u8; 32],
             timestamp: 1234567890,
             nonce: 42,
+            signed_transaction: vec![1, 2, 3, 4, 5],
             signature: [0u8; SIGNATURE_LENGTH],
         };
 
@@ -1234,6 +1251,7 @@ mod test {
             recipient: [1u8; 32],
             timestamp: 1234567890,
             nonce: 42,
+            signed_transaction: vec![1, 2, 3, 4, 5],
             signature: [0u8; SIGNATURE_LENGTH],
         };
 
@@ -1260,6 +1278,7 @@ mod test {
             recipient: [1u8; 32],
             timestamp: 1234567890,
             nonce: 42,
+            signed_transaction: vec![1, 2, 3, 4, 5],
             signature: [0u8; SIGNATURE_LENGTH],
         };
 
@@ -1285,6 +1304,7 @@ mod test {
             recipient: [7u8; 32],
             timestamp: 9999999999,
             nonce: 314159,
+            signed_transaction: vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
             signature: [0u8; SIGNATURE_LENGTH],
         };
 

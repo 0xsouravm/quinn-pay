@@ -24,19 +24,35 @@ pub struct Payment {
 ### Transport Parameters
 
 - `payment_supported: bool` - Server capability flag
+- `payment_required: bool` - Whether payment is mandatory
+- `min_payment_amount: Option<u64>` - Minimum payment per stream
 - `accepted_tokens: Vec<[u8; 32]>` - Accepted token mints
 - `payment_recipient: Option<[u8; 32]>` - Default recipient
 
-### API (Conceptual)
+### Configuration
 
 ```rust
-// Server receives stream with payment
-let payment = recv_stream.payment();
-payment.verify_signature()?;
-
-// Client sends stream with payment
-send_stream.attach_payment(payment);
+server_config
+    .payment_required(true)              // Enforce payment
+    .min_payment_amount(Some(1000));     // Minimum 1000 tokens per stream
 ```
+
+### Event
+
+```rust
+Event::PaymentReceived {
+    stream_id: StreamId,
+    payment: Payment {
+        signed_transaction: Vec<u8>,  // Serialized Solana transaction
+        amount: u64,
+        token: [u8; 32],
+        recipient: [u8; 32],
+        // ... other fields
+    }
+}
+```
+
+Submit `payment.signed_transaction` to Solana for settlement.
 
 ## Connection to x402
 
